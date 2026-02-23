@@ -266,8 +266,26 @@ public class TeacherController {
                 TeacherModel teacher = teacherRepository.findByEmail(email)
                                 .orElseThrow(() -> new NotFoundException("Teacher not found!"));
 
-                var result = examService.verifyStudentExam(teacher.getId(), studentExamId, answers);
+                examService.verifyStudentExam(teacher.getId(), studentExamId, answers);
                 return ResponseEntity.ok(new ApiResponse(true,
-                                "Student exam verified successfully!", result));
+                                "Student exam verified successfully!", null));
+        }
+
+        @PostMapping("/exam/{examId}/complete")
+        public ResponseEntity<ApiResponse> markExamAsCompleted(@PathVariable Long examId,
+                        Authentication authentication) {
+                if (authentication == null || !authentication.isAuthenticated()) {
+                        throw new UnauthorizedException("Missing or invalid token!");
+                }
+
+                String email = authentication.getName();
+                TeacherModel teacher = teacherRepository.findByEmail(email)
+                                .orElseThrow(() -> new NotFoundException("Teacher not found!"));
+
+
+
+                examService.markExamAsCompleted(teacher.getId(), examId);
+                return ResponseEntity.ok(new ApiResponse(true,
+                                "Exam marked as completed and students notified!", null));
         }
 }

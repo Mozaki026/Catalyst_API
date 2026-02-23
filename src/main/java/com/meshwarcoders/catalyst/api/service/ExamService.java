@@ -9,6 +9,7 @@ import com.meshwarcoders.catalyst.api.exception.UnauthorizedException;
 import com.meshwarcoders.catalyst.api.event.ExamSubmittedEvent;
 import com.meshwarcoders.catalyst.api.model.*;
 import com.meshwarcoders.catalyst.api.model.common.EnrollmentStatus;
+import com.meshwarcoders.catalyst.api.model.common.ExamStatus;
 import com.meshwarcoders.catalyst.api.repository.*;
 import com.meshwarcoders.catalyst.util.UtilFunctions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -134,7 +135,7 @@ public class ExamService {
     }
 
     @Transactional(readOnly = true)
-    public List<ExamSummaryDto> getExamsForLessonAsStudent(String studentEmail, Long lessonId) {
+    public List<StudentExamSummaryDto> getExamsForLessonAsStudent(String studentEmail, Long lessonId) {
         StudentModel student = studentRepository.findByEmail(studentEmail)
                 .orElseThrow(() -> new NotFoundException("Student not found!"));
 
@@ -148,10 +149,58 @@ public class ExamService {
             throw new UnauthorizedException("You are not approved in this lesson!");
         }
 
-        return examRepository.findByLesson(lesson)
-                .stream()
-                .map(this::toSummaryDto)
+        List<ExamModel> exams = examRepository.findByLesson(lesson);
+        List<StudentExamModel> studentExams = studentExamRepository.findByStudentAndExamIn(student, exams);
+        Map<Long, StudentExamModel> examSubmissionMap = studentExams.stream()
+                .collect(Collectors.toMap(e -> e.getExam().getId(), e -> e));
+
+        return exams.stream()
+                .map(exam -> {
+                    StudentExamModel submission = examSubmissionMap.get(exam.getId());
+                    ExamStatus status = getExamStatus(exam, submission);
+                    return toStudentSummaryDto(exam, status, submission!=null?submission.getGrade():null);
+                })
                 .collect(Collectors.toList());
+    }
+
+    private ExamStatus getExamStatus(ExamModel exam, StudentExamModel submission) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (submission != null) {
+            if (submission.getVerified() != null && submission.getVerified()) {
+                return ExamStatus.VERIFIED;
+            } else {
+                return ExamStatus.PENDING;
+            }
+        }
+
+        if (exam.getClosingDate() != null && now.isAfter(exam.getClosingDate())) {
+            return ExamStatus.MISSED;
+        }
+
+        if (exam.getExamDateTime() != null && now.isBefore(exam.getExamDateTime())) {
+            return ExamStatus.UPCOMING;
+        }
+
+        return ExamStatus.ACTIVE;
+    }
+
+    private StudentExamSummaryDto toStudentSummaryDto(ExamModel exam, ExamStatus status, Integer grade) {
+        String dateTimeString = exam.getExamDateTime() != null ? exam.getExamDateTime().toString() : null;
+        String closingDateString = exam.getClosingDate() != null ? exam.getClosingDate().toString() : null;
+
+        return new StudentExamSummaryDto(
+                exam.getId(),
+                exam.getLesson().getId(),
+                exam.getExamName(),
+                exam.getMaxGrade(),
+                dateTimeString,
+                closingDateString,
+                exam.getDurationMinutes(),
+                exam.getExamType(),
+                exam.getCompleted(),
+                grade,
+                status);
     }
 
     @Transactional(readOnly = true)
@@ -192,7 +241,7 @@ public class ExamService {
     }
 
     @Transactional(readOnly = true)
-    public ExamDetailsDto getExamByIdAsStudent(Long examId, String email) {
+    public StudentExamDetailsDto getExamByIdAsStudent(Long examId, String email) {
         ExamModel exam = examRepository.findById(examId)
                 .orElseThrow(() -> new NotFoundException("Exam not found!"));
 
@@ -204,16 +253,27 @@ public class ExamService {
             throw new UnauthorizedException("You are not approved in this lesson!");
         }
 
-        List<QuestionDto> questions = exam.getQuestions().stream()
-                .map(q -> new QuestionDto(
-                        q.getId(),
-                        q.getText(),
-                        q.getType(),
-                        q.getOptions(),
-                        q.getMaxPoints()))
-                .toList();
+        StudentExamModel studentExam = studentExamRepository.findByStudentAndExam(student, exam).orElse(null);
+        ExamStatus status = getExamStatus(exam, studentExam);
 
-        return new ExamDetailsDto(
+        List<QuestionDto> questions = null;
+        if (status != ExamStatus.UPCOMING && status != ExamStatus.PENDING) {
+            questions = exam.getQuestions().stream()
+                    .map(q -> new QuestionDto(
+                            q.getId(),
+                            q.getText(),
+                            q.getType(),
+                            q.getOptions(),
+                            q.getMaxPoints()))
+                    .toList();
+        }
+
+        StudentExamAnswersDto mySubmission = null;
+        if (status == ExamStatus.VERIFIED && studentExam != null) {
+            mySubmission = getStudentExamAnswers(exam.getLesson().getTeacher().getId(), studentExam.getId());
+        }
+
+        return new StudentExamDetailsDto(
                 exam.getId(),
                 exam.getLesson().getId(),
                 exam.getExamName(),
@@ -223,7 +283,8 @@ public class ExamService {
                 exam.getDurationMinutes(),
                 exam.getExamType(),
                 questions,
-                null);
+                status,
+                mySubmission);
     }
 
     private ExamSummaryDto toSummaryDto(ExamModel exam) {
@@ -238,7 +299,8 @@ public class ExamService {
                 dateTimeString,
                 closingDateString,
                 exam.getDurationMinutes(),
-                exam.getExamType());
+                exam.getExamType(),
+                exam.getCompleted());
     }
 
     @Transactional
@@ -356,7 +418,7 @@ public class ExamService {
     }
 
     @Transactional(readOnly = true)
-    public StudentExamAnswersResponseDto getStudentExamAnswers(Long teacherId, Long studentExamId) {
+    public StudentExamAnswersDto getStudentExamAnswers(Long teacherId, Long studentExamId) {
         StudentExamModel studentExam = studentExamRepository.findById(studentExamId)
                 .orElseThrow(() -> new NotFoundException("Student exam not found!"));
 
@@ -366,10 +428,11 @@ public class ExamService {
 
         List<StudentAnswerModel> answers = studentAnswerRepository.findByStudentExam(studentExam);
 
-        return new StudentExamAnswersResponseDto(
+        return new StudentExamAnswersDto(
                 studentExam.getStudent().getFullName(),
                 studentExam.getGrade(),
-                answers.stream().map(a -> new StudentAnswerResponseDto(
+                answers.stream().map(a -> new StudentAnswerDto(
+                        a.getId(),
                         new QuestionDto(
                                 a.getQuestion().getId(),
                                 a.getQuestion().getText(),
@@ -382,7 +445,7 @@ public class ExamService {
     }
 
     @Transactional
-    public StudentExamDto verifyStudentExam(Long teacherId, Long studentExamId, List<AnswerMarkDto> answers) {
+    public void verifyStudentExam(Long teacherId, Long studentExamId, List<AnswerMarkDto> answers) {
         StudentExamModel studentExam = studentExamRepository.findById(studentExamId)
                 .orElseThrow(() -> new NotFoundException("Student exam not found!"));
 
@@ -415,10 +478,38 @@ public class ExamService {
         studentExam.setVerified(true);
         studentExamRepository.save(studentExam);
 
-        return new StudentExamDto(
-                studentExam.getId(),
-                studentExam.getStudent().getFullName(),
-                studentExam.getGrade(),
-                studentExam.getVerified());
+        // return new StudentExamDto(
+        // studentExam.getId(),
+        // studentExam.getStudent().getFullName(),
+        // studentExam.getGrade(),
+        // studentExam.getVerified());
+    }
+
+    @Transactional
+    public void markExamAsCompleted(Long teacherId, Long examId) {
+        ExamModel exam = examRepository.findById(examId)
+                .orElseThrow(() -> new NotFoundException("Exam not found!"));
+
+        if (!exam.getLesson().getTeacher().getId().equals(teacherId)) {
+            throw new UnauthorizedException("You do not own this lesson!");
+        }
+
+        exam.setCompleted(true);
+        exam = examRepository.save(exam);
+
+        List<StudentModel> students = studentLessonRepository
+                .findByLessonAndStatus(exam.getLesson(), EnrollmentStatus.APPROVED)
+                .stream()
+                .map(StudentLessonModel::getStudent)
+                .toList();
+
+        notificationService.notifyStudents(
+                students,
+                "Exam Completed",
+                "Your exam '" + exam.getExamName() + "' results are now available.",
+                Map.of(
+                        "type", "EXAM_COMPLETED",
+                        "lessonId", exam.getLesson().getId().toString(),
+                        "examId", exam.getId().toString()));
     }
 }

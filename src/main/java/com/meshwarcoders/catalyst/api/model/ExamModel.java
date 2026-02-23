@@ -41,4 +41,6 @@ public class ExamModel {
     @JsonIgnore
     @OneToMany(mappedBy = "exam")
     private List<ExamQuestionModel> questions = new ArrayList<>();
+
+    private Boolean completed = false;
 }

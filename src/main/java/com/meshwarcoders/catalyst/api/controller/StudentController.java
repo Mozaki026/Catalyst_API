@@ -1,8 +1,7 @@
 package com.meshwarcoders.catalyst.api.controller;
 
 import com.meshwarcoders.catalyst.api.dto.request.AnswerRequest;
-import com.meshwarcoders.catalyst.api.dto.response.ApiResponse;
-import com.meshwarcoders.catalyst.api.dto.response.JoinStudentDto;
+import com.meshwarcoders.catalyst.api.dto.response.*;
 import com.meshwarcoders.catalyst.api.exception.UnauthorizedException;
 import com.meshwarcoders.catalyst.api.service.ExamService;
 import com.meshwarcoders.catalyst.api.service.LessonService;
@@ -52,7 +51,7 @@ public class StudentController {
         }
 
         String email = authentication.getName();
-        var exams = examService.getExamsForLessonAsStudent(email, lessonId);
+        List<StudentExamSummaryDto> exams = examService.getExamsForLessonAsStudent(email, lessonId);
         return ResponseEntity.ok(new ApiResponse(true,
                 "Exams fetched successfully!", exams));
     }
@@ -101,7 +100,7 @@ public class StudentController {
         }
 
         String email = authentication.getName();
-        var exam = examService.getExamByIdAsStudent(examId, email);
+        StudentExamDetailsDto exam = examService.getExamByIdAsStudent(examId, email);
         return ResponseEntity.ok(new ApiResponse(true,
                 "Exam details fetched successfully!", exam));
     }

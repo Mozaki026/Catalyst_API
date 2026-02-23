@@ -1,9 +1,9 @@
 package com.meshwarcoders.catalyst.api.dto.response;
 
-import com.meshwarcoders.catalyst.api.model.ExamModel;
+import com.meshwarcoders.catalyst.api.model.common.ExamStatus;
 import com.meshwarcoders.catalyst.api.model.common.ExamType;
 
-public record ExamSummaryDto(
+public record StudentExamSummaryDto(
         Long id,
         Long lessonId,
         String examName,
@@ -12,6 +12,7 @@ public record ExamSummaryDto(
         String closingDate,
         Integer durationMinutes,
         ExamType examType,
-        Boolean completed) {
-
+        Boolean completed,
+        Integer studentGrade,
+        ExamStatus status) {
 }

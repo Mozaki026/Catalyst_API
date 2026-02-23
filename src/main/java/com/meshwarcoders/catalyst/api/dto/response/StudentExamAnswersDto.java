@@ -2,8 +2,8 @@ package com.meshwarcoders.catalyst.api.dto.response;
 
 import java.util.List;
 
-public record StudentExamAnswersResponseDto(
+public record StudentExamAnswersDto(
         String studentName,
         Integer totalGrade,
-        List<StudentAnswerResponseDto> answers) {
+        List<StudentAnswerDto> answers) {
 }

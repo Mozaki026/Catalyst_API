@@ -30,9 +30,6 @@ public class LessonService {
         private TeacherRepository teacherRepository;
 
         @Autowired
-        private ExamRepository examRepository;
-
-        @Autowired
         private StudentRepository studentRepository;
 
         @Autowired
@@ -175,7 +172,7 @@ public class LessonService {
                                 exam.getExamName(), exam.getMaxGrade(),
                                 exam.getExamDateTime() != null ? exam.getExamDateTime().toString() : null,
                                 exam.getClosingDate() != null ? exam.getClosingDate().toString() : null,
-                                exam.getDurationMinutes(), exam.getExamType())).toList();
+                                exam.getDurationMinutes(), exam.getExamType(), exam.getCompleted())).toList();
 
                 LessonStudentsDto lessonStudentsDto = new LessonStudentsDto(studentsDetails.size(), studentsDetails);
                 LessonExamsDto lessonExamsDto = new LessonExamsDto(examSummaryDtos.size(), examSummaryDtos);
