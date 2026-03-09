@@ -31,7 +31,7 @@ public class ExamService {
     private ExamRepository examRepository;
 
     @Autowired
-    private ExamQuestionRepository examQuestionRepository;
+    private QuestionRepository questionRepository;
 
     @Autowired
     private LessonRepository lessonRepository;
@@ -87,19 +87,23 @@ public class ExamService {
         exam.setDurationMinutes(request.durationMinutes());
 
         exam = examRepository.save(exam);
-
+        List<QuestionModel> questionModels =new ArrayList<>();
         if (request.questions() != null) {
-            for (ExamQuestionRequest q : request.questions()) {
-                ExamQuestionModel qm = new ExamQuestionModel();
-                qm.setExam(exam);
+            for (QuestionRequest q : request.questions()) {
+                QuestionModel qm = new QuestionModel();
+                qm.setLesson(lesson);
                 qm.setText(q.text());
                 qm.setType(q.type());
                 qm.setOptions(q.options());
                 qm.setCorrectOptionIndex(q.correctOptionIndex());
                 qm.setMaxPoints(q.maxPoints() == null ? defaultPoints : q.maxPoints());
                 qm.setAnswer(q.answer());
-                examQuestionRepository.save(qm);
+                questionModels.add(qm);
+
+
             }
+            exam.setQuestions(questionModels);
+            questionRepository.saveAll(questionModels);
         }
 
         // Notify Students
@@ -337,12 +341,9 @@ public class ExamService {
 
         List<StudentAnswerModel> answers = answerRequests.stream()
                 .map(a -> {
-                    ExamQuestionModel question = examQuestionRepository.findById(a.questionId())
+                    QuestionModel question = questionRepository.findById(a.questionId())
                             .orElseThrow(() -> new NotFoundException("Question not found: " + a.questionId()));
 
-                    if (!question.getExam().getId().equals(exam.getId())) {
-                        throw new UnauthorizedException("Question does not belong to this exam!");
-                    }
 
                     StudentAnswerModel answer = new StudentAnswerModel();
                     answer.setStudentExam(studentExam);
@@ -375,7 +376,7 @@ public class ExamService {
         double totalGrade = 0.0;
 
         for (StudentAnswerModel ans : answers) {
-            ExamQuestionModel question = ans.getQuestion();
+            QuestionModel question = ans.getQuestion();
             int maxPoints = question.getMaxPoints();
 
             switch (question.getType()) {
@@ -409,7 +410,7 @@ public class ExamService {
         studentExamRepository.save(studentExam);
     }
 
-    private double calculateMcqMark(StudentAnswerModel ans, ExamQuestionModel question, int maxPoints) {
+    private double calculateMcqMark(StudentAnswerModel ans, QuestionModel question, int maxPoints) {
         if (ans.getSelectedOptions() == null || ans.getSelectedOptions().isEmpty()) {
             return 0.0;
         }

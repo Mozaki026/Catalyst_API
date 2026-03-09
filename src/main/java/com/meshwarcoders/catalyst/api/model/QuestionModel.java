@@ -11,15 +11,15 @@ import java.util.List;
 
 @Entity(name = "exam_questions")
 @Getter @Setter
-public class ExamQuestionModel {
+public class QuestionModel {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Setter(AccessLevel.NONE)
     private Long id;
 
-    @ManyToOne(optional = false)
-    private ExamModel exam;
+    @ManyToOne
+    private LessonModel lesson;
 
     @Column(nullable = false)
     private String text;

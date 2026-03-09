@@ -20,7 +20,7 @@ public class StudentAnswerModel {
     private StudentExamModel studentExam;
 
     @ManyToOne(optional = false)
-    private ExamQuestionModel question;
+    private QuestionModel question;
 
     @ElementCollection
     private List<Integer> selectedOptions;

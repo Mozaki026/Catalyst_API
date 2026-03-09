@@ -8,6 +8,7 @@ import com.meshwarcoders.catalyst.api.model.TeacherModel;
 import com.meshwarcoders.catalyst.api.repository.TeacherRepository;
 import com.meshwarcoders.catalyst.api.service.ExamService;
 import com.meshwarcoders.catalyst.api.service.LessonService;
+import com.meshwarcoders.catalyst.api.service.QuestionService;
 import com.meshwarcoders.catalyst.api.service.TeacherService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -39,6 +40,11 @@ public class TeacherController {
 
         @Autowired
         private TeacherRepository teacherRepository;
+
+
+    @Autowired
+    private QuestionService questionService; // أضف السطر ده هنا!
+
 
         // ================== GET ALL TEACHERS ==================
         @GetMapping("/all")
@@ -288,4 +294,51 @@ public class TeacherController {
                 return ResponseEntity.ok(new ApiResponse(true,
                                 "Exam marked as completed and students notified!", null));
         }
+
+
+    // ================== QUESTION BANK (TEACHER) ==================
+
+    @PostMapping("/lesson/{lessonId}/add-questions")
+    public ResponseEntity<ApiResponse> addQuestionToBank(
+            @Valid @RequestBody List<QuestionRequest> request,
+            @PathVariable Long lessonId,
+            Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Missing or invalid token!");
+        }
+
+        String email = authentication.getName();
+        TeacherModel teacher = teacherRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("Teacher not found!"));
+
+
+                questionService.addQuestion(teacher.getId(), request, lessonId);
+
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Question added to bank successfully!")
+        );
+    }
+
+    @GetMapping("/lesson/{lessonId}/get-questions")
+    public ResponseEntity<ApiResponse> getQuestionsByLesson(
+            @PathVariable Long lessonId,
+            Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new UnauthorizedException("Missing or invalid token!");
+        }
+
+        String email = authentication.getName();
+        TeacherModel teacher = teacherRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("Teacher not found!"));
+
+        var questions =
+                questionService.getQuestionsByLesson(teacher.getId(), lessonId);
+
+        return ResponseEntity.ok(
+                new ApiResponse(true, "Questions fetched successfully!", questions)
+        );
+    }
+
 }

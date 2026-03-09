@@ -39,8 +39,8 @@ public class ExamModel {
     private List<StudentExamModel> studentExams = new ArrayList<>();
 
     @JsonIgnore
-    @OneToMany(mappedBy = "exam")
-    private List<ExamQuestionModel> questions = new ArrayList<>();
+    @ManyToMany()
+    private List<QuestionModel> questions = new ArrayList<>();
 
     private Boolean completed = false;
 }

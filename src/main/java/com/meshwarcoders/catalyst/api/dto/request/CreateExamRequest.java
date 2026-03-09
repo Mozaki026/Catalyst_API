@@ -6,6 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 
 public record CreateExamRequest(@NotBlank(message = "examName is required") String examName, Integer maxGrade,
-        String examDateTime, String closingDate, Integer durationMinutes, Integer defaultPoints,
-        List<ExamQuestionRequest> questions, ExamType examType ) {
+                                String examDateTime, String closingDate, Integer durationMinutes, Integer defaultPoints,
+                                List<QuestionRequest> questions, ExamType examType ) {
 }
